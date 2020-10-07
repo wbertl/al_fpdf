@@ -11,7 +11,7 @@ use setasign\Fpdi\Fpdi;
  * $pdf->setTemplate ( 'Example.pdf' );
  * $pdf->getPage (1); // write to Page 1
  * $pdf->setXY( 100, 100 );
- * $pdf->Write( 4, 'Beispieltext');
+ * $pdf->Write( 'Beispieltext', 4);
  * $pdf->Render();
  * 
  * 
@@ -33,10 +33,16 @@ class Pdf {
     
     var $output;
     
-    function __construct() {
-        require_once(\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::extPath('al_fpdf').'Classes/Lib/Fpdf/fpdf.php'); 
+    function __construct( $class = false, $params = false) {
+        #require_once(\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::extPath('al_fpdf').'Classes/Lib/Fpdf/fpdf.php'); 
         
-        $this->pdf = new Fpdi();      
+        if (!$class) {
+            $this->pdf = new Fpdi();     
+        } else {
+            $this->pdf = new $class( $params );
+        }
+       
+        $this->pdf->AliasNbPages();
        
         // set Default Margin
         $this->setLeftMargin( 25 );
@@ -53,7 +59,7 @@ class Pdf {
      * @param string $type ... Either S (return as String) od F (write File to location) or default I (output)
      */
     
-    function render( $filename = '', $type = 'I') {
+    function render( $filename = '', $type = 'I', $skipPages = []) {
         /*$pageNo = 3;
         for ($pageNo = 1; $pageNo <= $this->pageCount; $pageNo++) {
             // import a page
@@ -86,7 +92,7 @@ class Pdf {
         }*/
         
         // fill the missing Pages       
-        $this->getPage ( $this->pageCount );
+        $this->getPage ( $this->pageCount, $skipPages );
             
         return $this->pdf->Output($filename, $type);
         //$this->pdf->Output();
@@ -105,9 +111,10 @@ class Pdf {
     /**
      * get Page
      * @param int $pageNo .. Number of Page
+     * @param bool $skip ... if set, Pages before are skipped
      * @return unknown
      */
-    function getPage ( $pageNo ) {
+    function getPage ( $pageNo, $skipPages = [] ) {
         
         if ($pageNo > $this->pageCount) {
             error_log( $pageNo . ' is out of Range 1 - ' . $this->pageCount);
@@ -121,16 +128,21 @@ class Pdf {
         
         $this->currentPageNo++;
         
-        if ($pageNo > $this->currentPageNo) {
+        if (($pageNo > $this->currentPageNo) && ($skip == false)) {
             $page = $this->currentPageNo;
             
             // add Pages before this page in multisite document
             for ($page; $page < $pageNo; $page++ ) {
+                if( in_array($page,$skipPages) ) {
+                    continue;
+                }
                 $this->addPage ( $page );
             } 
         }               
         
-        $this->addPage( $pageNo );
+        if (!in_array($pageNo, $skipPages)) {
+            $this->addPage( $pageNo );
+        }
 
     }
     
@@ -147,6 +159,14 @@ class Pdf {
        $this->pdf->AddPage();
         
        $this->pdf->useTemplate($currentPage, ['adjustPageSize' => true]);
+    }
+    
+    function getPageWidth() {
+        return $this->pdf->GetPageWidth();
+    }
+    
+    function getStringWidth( $text ) {
+        return $this->pdf->GetStringWidth($text);
     }
     
     function getOutput () {
@@ -174,7 +194,24 @@ class Pdf {
     }
 
     function setXY( $x, $y) {
-        $this->pdf->setXY( (int)$x, (int)$y );
+        $this->pdf->setXY( $x, $y );
+    }
+    
+    function setX( $x ) {
+        $this->pdf->SetX( $x );
+    }
+    
+    function setY( $Y ) {
+        $this->pdf->SetY( $y );
+    }
+    
+    
+    function Cell($w, $h=0, $txt='', $border=0, $ln=0, $align='', $fill=false, $link='') {
+        $this->pdf->Cell($w, $h, $txt, $border, $ln, $align, $fill, $link);
+    }
+    
+    function MultiCell($w, $h, $txt, $border=0, $align='J', $fill=false) {
+        $this->pdf->MultiCell($w, $h, $txt, $border, $align, $fill);
     }
     
     function Ln() {
@@ -183,5 +220,9 @@ class Pdf {
     
     function write ( $text, $height = 4 ) {
         $this->pdf->Write( (int)$height, $text);
-    }      
+    }  
+    
+    function  Text($x, $y, $txt) {
+        $this->pdf-> Text($x, $y, $txt);
+    }
 }
